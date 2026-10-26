@@ -1,6 +1,6 @@
 import json
-import pickle
 from datetime import datetime
+
 
 # Global state
 orders = {}
@@ -8,50 +8,73 @@ next_id = 1
 menu = {}
 VALID_STATUSES = ["placed", "cooking", "out_for_delivery", "delivered"]
 
-def create_order(customer, items, order_history=[]):
+
+def create_order(customer, items, order_history=None):
     global next_id
+    if order_history is None:
+        order_history = []
+        
     total = 0
     for i in items:
         total += menu.get(i, 99)  # unknown dishes silently cost 99
-    orders[next_id] = {"customer": customer, "items": items, "total": total, "status": "placed"}
+        
+    orders[next_id] = {
+        "customer": customer,
+        "items": items,
+        "total": total,
+        "status": "placed"
+    }
     order_history.append(next_id)
     next_id += 1
     return order_history[-1]
 
+
 def update_order_status(order_id, status):
     try:
         orders[order_id]["status"] = status
-    except:
+    except KeyError:
         pass
+
 
 def read_menu_config(file="menu.json"):
     global menu
     try:
-        f = open(file)
-        menu = json.load(f)
+        with open(file, "r", encoding="utf-8") as f:
+            menu = json.load(f)
     except Exception:
         menu = {"pizza": 250, "burger": 150, "fries": 90, "coke": 40}
+
 
 def daily_revenue():
     revenue = 0
     for o in orders:
         if orders[o]["status"] == "delivered":
-            revenue = revenue + orders[o]["total"]
+            revenue += orders[o]["total"]
     return revenue
 
-def backup_orders(file="orders.pkl"):
-    f = open(file, "wb")
-    pickle.dump(orders, f)
-    f.close()
 
-def restore_orders(file="orders.pkl"):
+def backup_orders(file="orders.json"):
+    with open(file, "w", encoding="utf-8") as f:
+        json.dump(orders, f)
+
+
+def restore_orders(file="orders.json"):
     global orders
-    orders = pickle.load(open(file, "rb"))
+    try:
+        with open(file, "r", encoding="utf-8") as f:
+            loaded_orders = json.load(f)
+            # JSON converts int keys to strings; convert them back
+            orders = {int(k): v for k, v in loaded_orders.items()}
+    except FileNotFoundError:
+        orders = {}
+
 
 def printQueue():
-    print("Order queue at %s" % datetime.now())
+    print(f"Order queue at {datetime.now()}")
     for o in orders:
-        print(o, orders[o]["customer"], orders[o]["status"], orders[o]["total"])
+        print(f"{o} {orders[o]['customer']} "
+              f"{orders[o]['status']} {orders[o]['total']}")
+
 
 def main():
     read_menu_config()
@@ -67,4 +90,6 @@ def main():
     restore_orders()
     printQueue()
 
-main()
+
+if __name__ == "__main__":
+    main()
